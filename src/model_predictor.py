@@ -13,7 +13,7 @@ from pandas.util import hash_pandas_object
 from pydantic import BaseModel
 
 from problem_config import ProblemConst, create_prob_config
-from raw_data_processor import RawDataProcessor
+from data_processor import RawDataProcessor
 from utils import AppConfig, AppPath
 
 PREDICTOR_API_PORT = 8000
