@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import time
+import json
 
 import mlflow
 import pandas as pd
@@ -38,11 +39,13 @@ class ModelPredictor:
         )
 
         # load category_index
-        self.category_index = RawDataProcessor.load_category_index(self.prob_config)
+        self.category_index = RawDataProcessor.load_category_index(
+            self.prob_config)
 
         # load model
         model_uri = os.path.join(
-            "models:/", self.config["model_name"], str(self.config["model_version"])
+            "models:/", self.config["model_name"], str(
+                self.config["model_version"])
         )
         self.model = mlflow.pyfunc.load_model(model_uri)
 
@@ -65,6 +68,12 @@ class ModelPredictor:
         ModelPredictor.save_request_data(
             feature_df, self.prob_config.captured_data_dir, data.id
         )
+        # save request test
+        output_file_path = os.path.join(
+            "./data/curl", self.config["phase_id"], self.config["prob_id"], "payload.json")
+        logging.info(output_file_path)
+        ModelPredictor.save_request_json(
+            data=data, output_file_path=output_file_path)
 
         prediction = self.model.predict(feature_df)
         is_drifted = self.detect_drift(feature_df)
@@ -83,24 +92,39 @@ class ModelPredictor:
             filename = data_id
         else:
             filename = hash_pandas_object(feature_df).sum()
-        output_file_path = os.path.join(captured_data_dir, f"{filename}.parquet")
+        output_file_path = os.path.join(
+            captured_data_dir, f"{filename}.parquet")
         feature_df.to_parquet(output_file_path, index=False)
         return output_file_path
 
+    @staticmethod
+    def save_request_json(data: Data, output_file_path):
+        if not os.path.isfile(output_file_path):
+            jsonStr = json.dumps(data.__dict__)
+            with open(output_file_path, "w") as f:
+                f.write(jsonStr)
 
 class PredictorApi:
-    def __init__(self, predictor: ModelPredictor):
-        self.predictor = predictor
+    def __init__(self, predictor1: ModelPredictor, predictor2: ModelPredictor):
+        self.predictor1 = predictor1
+        self.predictor2 = predictor2
         self.app = FastAPI()
 
         @self.app.get("/")
         async def root():
             return {"message": "hello"}
-
+        
         @self.app.post("/phase-1/prob-1/predict")
-        async def predict(data: Data, request: Request):
+        async def predict1(data: Data, request: Request):
             self._log_request(request)
-            response = self.predictor.predict(data)
+            response = self.predictor1.predict(data)
+            self._log_response(response)
+            return response
+        
+        @self.app.post("/phase-1/prob-2/predict")
+        async def predict2(data: Data, request: Request):
+            self._log_request(request)
+            response = self.predictor2.predict(data)
             self._log_response(response)
             return response
 
@@ -117,18 +141,27 @@ class PredictorApi:
 
 
 if __name__ == "__main__":
-    default_config_path = (
+    default_config_path1 = (
         AppPath.MODEL_CONFIG_DIR
         / ProblemConst.PHASE1
         / ProblemConst.PROB1
         / "model-1.yaml"
     ).as_posix()
 
+    default_config_path2 = (
+        AppPath.MODEL_CONFIG_DIR
+        / ProblemConst.PHASE1
+        / ProblemConst.PROB2
+        / "model-1.yaml"
+    ).as_posix()
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path", type=str, default=default_config_path)
+    parser.add_argument("--config-path1", type=str, default=default_config_path1)
+    parser.add_argument("--config-path2", type=str, default=default_config_path2)
     parser.add_argument("--port", type=int, default=PREDICTOR_API_PORT)
     args = parser.parse_args()
 
-    predictor = ModelPredictor(config_file_path=args.config_path)
-    api = PredictorApi(predictor)
+    predictor1 = ModelPredictor(config_file_path=args.config_path1)
+    predictor2 = ModelPredictor(config_file_path=args.config_path2)
+    api = PredictorApi(predictor1, predictor2)
     api.run(port=args.port)
