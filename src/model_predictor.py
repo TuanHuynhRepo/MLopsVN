@@ -68,12 +68,6 @@ class ModelPredictor:
         ModelPredictor.save_request_data(
             feature_df, self.prob_config.captured_data_dir, data.id
         )
-        # save request test
-        output_file_path = os.path.join(
-            "./data/curl", self.config["phase_id"], self.config["prob_id"], "payload.json")
-        logging.info(output_file_path)
-        ModelPredictor.save_request_json(
-            data=data, output_file_path=output_file_path)
 
         prediction = self.model.predict(feature_df)
         is_drifted = self.detect_drift(feature_df)
@@ -97,12 +91,12 @@ class ModelPredictor:
         feature_df.to_parquet(output_file_path, index=False)
         return output_file_path
 
-    @staticmethod
-    def save_request_json(data: Data, output_file_path):
-        if not os.path.isfile(output_file_path):
-            jsonStr = json.dumps(data.__dict__)
-            with open(output_file_path, "w") as f:
-                f.write(jsonStr)
+    # @staticmethod
+    # def save_request_json(data: Data, output_file_path):
+    #     if not os.path.isfile(output_file_path):
+    #         jsonStr = json.dumps(data.__dict__)
+    #         with open(output_file_path, "w") as f:
+    #             f.write(jsonStr)
 
 class PredictorApi:
     def __init__(self, predictor1: ModelPredictor, predictor2: ModelPredictor):

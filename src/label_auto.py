@@ -26,7 +26,8 @@ def label_captured_data(prob_config: ProblemConfig):
     n_cluster = int(n_samples / 10) * len(np.unique(train_y))
     kmeans_model = MiniBatchKMeans(
         n_clusters=n_cluster, random_state=prob_config.random_state
-    ).fit(train_x)
+    )
+    kmeans_model.fit(train_x)
 
     logging.info("Predict the cluster assignments for the new data")
     kmeans_clusters = kmeans_model.predict(np_captured_x)
