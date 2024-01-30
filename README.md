@@ -1,4 +1,4 @@
-# MLopsVN clone
+# MLopsVN
 
 ## Prepare to run on service cloud EC2 of AWS
 
